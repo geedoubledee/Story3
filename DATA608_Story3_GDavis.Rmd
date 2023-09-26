@@ -33,40 +33,51 @@ geo_df <- geojson_read(my_url,  what = "sp")
 geo_df@data <- geo_df@data |>
     mutate(google_name = gsub(" \\(United States\\)", "", google_name))
 
-#Marriage & population data for temporary usage - replace
-temp_data1 <- read.table("https://raw.githubusercontent.com/holtzy/R-graph-gallery/master/DATA/State_mariage_rate.csv", header=T, sep=",", na.strings="---")
+#Firearm mortality data
+firearm_mortality <- read.csv("https://raw.githubusercontent.com/geedoubledee/Story3/main/cdc_nchs_firearm_mortality_by_state.csv")
+firearm_mortality$STATE <- state.name[match(firearm_mortality$STATE,state.abb)]
+firearm_mortality <- firearm_mortality |>
+    filter(YEAR == 2021 | YEAR == 2005) |>
+    arrange(STATE, YEAR) |>
+    mutate(RATE_CHANGE_SINCE_2005 = RATE - lag(RATE)) |>
+    filter(YEAR == 2021)
 
 # Fortify
 geo_fort <- fortify(geo_df, region="google_name")
 geo_fort <- geo_fort |>
-  left_join(temp_data1, by = c("id" = "state"))
+    filter(id != "District of Columbia") |>
+    left_join(firearm_mortality, by = c("id" = "STATE")) |>
+    mutate(bin = as.factor(case_when(RATE < 5 ~ 5,
+                                     RATE < 10 ~ 10,
+                                     RATE < 15 ~ 15,
+                                     RATE < 20 ~ 20,
+                                     RATE < 25 ~ 25,
+                                     RATE < 30 ~ 30,
+                                     RATE >= 30 ~ 35)))
 
 # Calculate hexagon centers for labeling purposes:
 centers <- cbind.data.frame(data.frame(gCentroid(geo_df, byid = TRUE),
                                        id = geo_df@data$iso3166_2))
+centers <- centers |>
+    filter(id != "DC")
 
-# Bin data
-geo_fort$bin <- cut(geo_fort$y_2015 , breaks=c(seq(5,10), Inf),
-                   labels=c("5-6", "6-7", "7-8", "8-9", "9-10", "10+"),
-                   include.lowest = TRUE)
- 
 # Prepare palette from viridis
-my_palette <- rev(magma(8))[c(-1,-8)]
+my_palette <- brewer.pal(n = 7, name = "OrRd")
  
 # Plot the shape
 p <- ggplot() +
     geom_polygon(data = geo_fort, aes(fill = bin, x = long, y = lat,
                                       group = group),
                  linewidth = 0, alpha = 0.9) +
-    geom_text(data = centers, aes(x = x, y = y, label = id), color="white",
+    geom_text(data = centers, aes(x = x, y = y, label = id), color="black",
               size = 3, alpha = 0.6) +
     scale_fill_manual(values = my_palette,
-                      name = "Wedding per 1000 people in 2015",
+                      name = "Firearm Death Rate Per 100,000 People*",
                       guide = guide_legend(keyheight = unit(3, units = "mm"),
                                            keywidth = unit(12, units = "mm"),
                                            label.position = "bottom",
                                            title.position = 'top', nrow=1)) +
-    labs(title = "A map of marriage rates, state by state") +
+    labs(title = "A Map of Firearm Death Rates by State") +
     theme_void() +
     theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom") +
     coord_map()
