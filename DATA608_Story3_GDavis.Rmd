@@ -1,0 +1,35 @@
+---
+title: "DATA608 - Story 3"
+author: "Glen Dale Davis"
+date: "2023-09-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Setup:
+
+```{r packages, warning=FALSE, message=FALSE}
+library(geojsonio)
+library(RColorBrewer)
+library(rgdal)
+library(shiny)
+library(tidyverse)
+
+```
+
+## Data:
+
+```{r data}
+my_url <- ""
+
+```
+
+## App:
+
+```{r app}
+runApp("my_app", display.mode = "showcase")
+
+```
