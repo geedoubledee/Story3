@@ -18,15 +18,13 @@ library(maptools)
 library(RColorBrewer)
 library(rgeos)
 library(rgdal)
-library(shiny)
 library(tidyverse)
-library(viridis)
 
 ```
 
 ## Data:
 
-```{r data}
+```{r data1}
 #Geojson File Source: https://team.carto.com/u/andrew/tables/andrew.us_states_hexgrid/public/map
 my_url <- "https://raw.githubusercontent.com/geedoubledee/Story3/main/us_states_hexgrid.geojson"
 geo_df <- geojson_read(my_url,  what = "sp")
@@ -61,11 +59,11 @@ centers <- cbind.data.frame(data.frame(gCentroid(geo_df, byid = TRUE),
 centers <- centers |>
     filter(id != "DC")
 
-# Prepare palette from viridis
+#Prepare pallet
 my_palette <- brewer.pal(n = 7, name = "OrRd")
  
 # Plot the shape
-p <- ggplot() +
+p1 <- ggplot() +
     geom_polygon(data = geo_fort, aes(fill = bin, x = long, y = lat,
                                       group = group),
                  linewidth = 0, alpha = 0.9) +
@@ -81,13 +79,44 @@ p <- ggplot() +
     theme_void() +
     theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom") +
     coord_map()
-p
+p1
 
 ```
 
-## App:
+```{r data2}
+my_url <- "https://raw.githubusercontent.com/geedoubledee/Story3/main/strictest-gun-laws-by-state.csv"
+gun_law_strictness <- read.csv(my_url)
+keep <- c("state", "gunLawsGiffordGrade")
+cols <- c("STATE", "Gifford")
+gun_law_strictness <- gun_law_strictness |>
+    select(all_of(keep))
+colnames(gun_law_strictness) <- cols
+gun_law_strictness$Gifford <- gsub("[^[:alnum:]]", "",
+                                   gun_law_strictness$Gifford)
+levels <- c("Most Lax", "More Lax", "Lax", "Strict", "Strictest")
+gun_law_strictness <- gun_law_strictness |>
+    mutate(
+        Strictness = as.factor(case_when(
+            Gifford < "B" ~ "Strictest",
+            Gifford < "C" ~ "Strict",
+            Gifford < "D" ~ "Lax",
+            Gifford < "F" ~ "More Lax",
+            Gifford >= "F" ~ "Most Lax"))
+        )
 
-```{r app}
-runApp("my_app", display.mode = "showcase")
+gun_law_strictness$Strictness <- factor(gun_law_strictness$Strictness,
+                                        levels = levels)
+combined <- firearm_mortality |>
+    left_join(gun_law_strictness, by = "STATE") |>
+    mutate(RANK = row_number(desc(RATE)),
+           ABBREV = state.abb[match(STATE,state.name)])
+p2 <- combined |>
+    ggplot(aes(x = RANK, y = RATE_CHANGE_SINCE_2005, fill = Strictness,
+               size = Strictness)) +
+    geom_point(shape = 21, color = "#3F007D", alpha = 0.6) +
+    scale_color_brewer(palette = "Purples", aesthetics = "fill") +
+    labs(title = "Death Rates in States with Most Lax Gun Laws Have Increased More Since 2005 than Death Rates in States with Stricter Gun Laws") +
+    theme_classic()
+p2
 
 ```
